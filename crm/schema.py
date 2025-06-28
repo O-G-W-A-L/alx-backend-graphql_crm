@@ -1,43 +1,72 @@
 import graphene
 from graphene_django import DjangoObjectType
+from graphene_django.filter import DjangoFilterConnectionField
 from .models import Customer, Product, Order
-from django.core.exceptions import ValidationError
+from .filters import CustomerFilter, ProductFilter, OrderFilter
 from django.utils import timezone
-
 from decimal import Decimal, ROUND_HALF_UP
 
-# TYPES
+
+# ------------------ FILTER NODES ------------------
+class CustomerNode(DjangoObjectType):
+    class Meta:
+        model = Customer
+        interfaces = (graphene.relay.Node,)
+        filterset_class = CustomerFilter
+
+
+class ProductNode(DjangoObjectType):
+    class Meta:
+        model = Product
+        interfaces = (graphene.relay.Node,)
+        filterset_class = ProductFilter
+
+
+class OrderNode(DjangoObjectType):
+    class Meta:
+        model = Order
+        interfaces = (graphene.relay.Node,)
+        filterset_class = OrderFilter
+
+
+# ------------------ TYPES ------------------
 class CustomerType(DjangoObjectType):
     class Meta:
         model = Customer
         fields = '__all__'
+
 
 class ProductType(DjangoObjectType):
     class Meta:
         model = Product
         fields = '__all__'
 
+
 class OrderType(DjangoObjectType):
     class Meta:
         model = Order
         fields = '__all__'
 
-# INPUTS
+
+# ------------------ INPUTS ------------------
 class CustomerInput(graphene.InputObjectType):
     name = graphene.String(required=True)
     email = graphene.String(required=True)
     phone = graphene.String()
+
 
 class ProductInput(graphene.InputObjectType):
     name = graphene.String(required=True)
     price = graphene.Float(required=True)
     stock = graphene.Int()
 
+
 class OrderInput(graphene.InputObjectType):
     customer_id = graphene.ID(required=True)
     product_ids = graphene.List(graphene.ID, required=True)
 
-# MUTATIONS
+
+# ------------------ MUTATIONS ------------------
 class CreateCustomer(graphene.Mutation):
     class Arguments:
         input = CustomerInput(required=True)
@@ -53,6 +82,7 @@ class CreateCustomer(graphene.Mutation):
         customer.full_clean()
         customer.save()
         return CreateCustomer(customer=customer, message="Customer created successfully.")
+
 
 class BulkCreateCustomers(graphene.Mutation):
     class Arguments:
@@ -77,7 +107,7 @@ class BulkCreateCustomers(graphene.Mutation):
 
         created = Customer.objects.bulk_create(valid_customers)
         return BulkCreateCustomers(customers=created, errors=errors)
-    
+
 
 class CreateProduct(graphene.Mutation):
     class Arguments:
@@ -89,7 +119,7 @@ class CreateProduct(graphene.Mutation):
         try:
             price = float(input.price)
         except (ValueError, TypeError):
-            raise Exception("Price must be a number or a numeric string.")
+            raise Exception("Price must be a valid number.")
 
         if price <= 0:
             raise Exception("Price must be positive.")
@@ -97,15 +127,12 @@ class CreateProduct(graphene.Mutation):
         if input.stock is not None and input.stock < 0:
             raise Exception("Stock cannot be negative.")
 
-        # Convert float to Decimal with 2 decimal places for accuracy
         price = Decimal(str(price)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
         product = Product(name=input.name, price=price, stock=input.stock or 0)
         product.full_clean()
         product.save()
         return CreateProduct(product=product)
-
-
 
 
 class CreateOrder(graphene.Mutation):
@@ -138,13 +165,21 @@ class CreateOrder(graphene.Mutation):
         order.products.set(products)
         return CreateOrder(order=order)
 
-# ------------------ EXPORT MUTATIONS ------------------
+
+# ------------------ QUERY EXPORT ------------------
+class Query(graphene.ObjectType):
+    hello = graphene.String(default_value="Hello from CRM schema!")
+    
+    # Here DjangoFilterConnectionField with filterset_class assigned to Nodes will automatically
+    # add a single "filter" argument that accepts the filter input matching your FilterSet fields.
+    all_customers = DjangoFilterConnectionField(CustomerNode)
+    all_products = DjangoFilterConnectionField(ProductNode)
+    all_orders = DjangoFilterConnectionField(OrderNode)
+
+
+# ------------------ MUTATION EXPORT ------------------
 class Mutation(graphene.ObjectType):
     create_customer = CreateCustomer.Field()
     bulk_create_customers = BulkCreateCustomers.Field()
     create_product = CreateProduct.Field()
     create_order = CreateOrder.Field()
-
-class Query(graphene.ObjectType):
-    hello = graphene.String(default_value="Hello from CRM schema!")
-
