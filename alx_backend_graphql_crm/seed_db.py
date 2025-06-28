@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import random
 
 # Setup Django environment for standalone script usage
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'graphql_crm.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'alx_backend_graphql_crm.settings')
 django.setup()
 
 from crm.models import Customer, Product, Order
