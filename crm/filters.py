@@ -10,31 +10,12 @@ class CustomerFilter(django_filters.FilterSet):
     created_at_lte = django_filters.DateFilter(field_name='created_at', lookup_expr='lte')
     phone_pattern = django_filters.CharFilter(method='filter_phone_pattern')
 
-    order_by = django_filters.OrderingFilter(
-        fields=(
-            ('name', 'name'),
-            ('email', 'email'),
-            ('created_at', 'created_at'),
-        ),
-        field_labels={
-            'name': 'Name',
-            'email': 'Email',
-            'created_at': 'Created At',
-        },
-        label='Sort by'
-    )
-
     def filter_phone_pattern(self, queryset, name, value):
-        # Example: filter phone numbers starting with +1
         return queryset.filter(phone__startswith=value)
 
     class Meta:
         model = Customer
-        fields = [
-            'name_icontains', 'email_icontains',
-            'created_at_gte', 'created_at_lte',
-            'phone_pattern',
-        ]
+        fields = ['name_icontains', 'email_icontains', 'created_at_gte', 'created_at_lte', 'phone_pattern']
 
 
 class ProductFilter(django_filters.FilterSet):
@@ -44,26 +25,9 @@ class ProductFilter(django_filters.FilterSet):
     stock_gte = django_filters.NumberFilter(field_name='stock', lookup_expr='gte')
     stock_lte = django_filters.NumberFilter(field_name='stock', lookup_expr='lte')
 
-    order_by = django_filters.OrderingFilter(
-        fields=(
-            ('name', 'name'),
-            ('price', 'price'),
-            ('stock', 'stock'),
-        ),
-        field_labels={
-            'name': 'Name',
-            'price': 'Price',
-            'stock': 'Stock',
-        },
-        label='Sort by'
-    )
-
     class Meta:
         model = Product
-        fields = [
-            'name_icontains', 'price_gte', 'price_lte',
-            'stock_gte', 'stock_lte',
-        ]
+        fields = ['name_icontains', 'price_gte', 'price_lte', 'stock_gte', 'stock_lte']
 
 
 class OrderFilter(django_filters.FilterSet):
@@ -74,18 +38,6 @@ class OrderFilter(django_filters.FilterSet):
     customer_name_icontains = django_filters.CharFilter(field_name='customer__name', lookup_expr='icontains')
     product_name_icontains = django_filters.CharFilter(method='filter_by_product_name')
     product_id = django_filters.NumberFilter(method='filter_by_product_id')
-
-    order_by = django_filters.OrderingFilter(
-        fields=(
-            ('total_amount', 'total_amount'),
-            ('order_date', 'order_date'),
-        ),
-        field_labels={
-            'total_amount': 'Total Amount',
-            'order_date': 'Order Date',
-        },
-        label='Sort by'
-    )
 
     def filter_by_product_name(self, queryset, name, value):
         return queryset.filter(products__name__icontains=value).distinct()

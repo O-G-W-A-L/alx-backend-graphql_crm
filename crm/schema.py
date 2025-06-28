@@ -7,7 +7,33 @@ from django.utils import timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 
-# ------------------ FILTER NODES ------------------
+# FILTER INPUT TYPES
+
+class CustomerFilterInput(graphene.InputObjectType):
+    nameIcontains = graphene.String()
+    emailIcontains = graphene.String()
+    createdAtGte = graphene.String()
+    createdAtLte = graphene.String()
+    phonePattern = graphene.String()
+
+class ProductFilterInput(graphene.InputObjectType):
+    nameIcontains = graphene.String()
+    priceGte = graphene.Float()
+    priceLte = graphene.Float()
+    stockGte = graphene.Int()
+    stockLte = graphene.Int()
+
+class OrderFilterInput(graphene.InputObjectType):
+    totalAmountGte = graphene.Float()
+    totalAmountLte = graphene.Float()
+    orderDateGte = graphene.String()
+    orderDateLte = graphene.String()
+    customerNameIcontains = graphene.String()
+    productNameIcontains = graphene.String()
+    productId = graphene.Int()
+
+
+# FILTER NODES
 class CustomerNode(DjangoObjectType):
     class Meta:
         model = Customer
@@ -29,7 +55,7 @@ class OrderNode(DjangoObjectType):
         filterset_class = OrderFilter
 
 
-# ------------------ TYPES ------------------
+# TYPES
 class CustomerType(DjangoObjectType):
     class Meta:
         model = Customer
@@ -48,7 +74,7 @@ class OrderType(DjangoObjectType):
         fields = '__all__'
 
 
-# ------------------ INPUTS ------------------
+# INPUTS
 class CustomerInput(graphene.InputObjectType):
     name = graphene.String(required=True)
     email = graphene.String(required=True)
@@ -66,7 +92,57 @@ class OrderInput(graphene.InputObjectType):
     product_ids = graphene.List(graphene.ID, required=True)
 
 
-# ------------------ MUTATIONS ------------------
+# CUSTOM FILTERED CONNECTION FIELD 
+
+class FilteredConnectionField(DjangoFilterConnectionField):
+    def __init__(self, type, *args, **kwargs):
+        filter_class = kwargs.pop('filter_class', None)
+        if filter_class:
+            kwargs.setdefault('args', {})
+            kwargs['args']['filter'] = graphene.Argument(filter_class)
+            kwargs['args']['orderBy'] = graphene.String()
+        super().__init__(type, *args, **kwargs)
+
+    def get_queryset(self, queryset, info, **args):
+        filter_data = args.get('filter')
+        order_by = args.get('orderBy')
+
+        if filter_data:
+            django_filters = {}
+
+            for key, value in filter_data.items():
+                if value is None:
+                    continue
+
+                # Convert camelCase filter keys to Django ORM keys:
+                # e.g. nameIcontains -> name__icontains
+                django_key = key
+
+                # Mapping replacements
+                django_key = django_key.replace('Icontains', '__icontains')
+                django_key = django_key.replace('Gte', '__gte')
+                django_key = django_key.replace('Lte', '__lte')
+                django_key = django_key.replace('Pattern', '__startswith')
+                django_key = django_key.replace('Id', '_id')
+                django_key = django_key.replace('At', '_at')
+                django_key = django_key.replace('Amount', '_amount')
+                django_key = django_key.replace('Date', '_date')
+                django_key = django_key.replace('Name', '_name')
+
+                # Convert first char to lowercase for field name consistency
+                django_key = django_key[0].lower() + django_key[1:]
+
+                django_filters[django_key] = value
+
+            queryset = queryset.filter(**django_filters)
+
+        if order_by:
+            queryset = queryset.order_by(order_by)
+
+        return queryset
+
+
+#  MUTATIONS 
 class CreateCustomer(graphene.Mutation):
     class Arguments:
         input = CustomerInput(required=True)
@@ -166,18 +242,25 @@ class CreateOrder(graphene.Mutation):
         return CreateOrder(order=order)
 
 
-# ------------------ QUERY EXPORT ------------------
+# QUERY EXPORT 
 class Query(graphene.ObjectType):
     hello = graphene.String(default_value="Hello from CRM schema!")
-    
-    # Here DjangoFilterConnectionField with filterset_class assigned to Nodes will automatically
-    # add a single "filter" argument that accepts the filter input matching your FilterSet fields.
-    all_customers = DjangoFilterConnectionField(CustomerNode)
-    all_products = DjangoFilterConnectionField(ProductNode)
-    all_orders = DjangoFilterConnectionField(OrderNode)
+
+    all_customers = FilteredConnectionField(
+        CustomerNode,
+        filter_class=CustomerFilterInput
+    )
+    all_products = FilteredConnectionField(
+        ProductNode,
+        filter_class=ProductFilterInput
+    )
+    all_orders = FilteredConnectionField(
+        OrderNode,
+        filter_class=OrderFilterInput
+    )
 
 
-# ------------------ MUTATION EXPORT ------------------
+#  MUTATION EXPORT
 class Mutation(graphene.ObjectType):
     create_customer = CreateCustomer.Field()
     bulk_create_customers = BulkCreateCustomers.Field()
