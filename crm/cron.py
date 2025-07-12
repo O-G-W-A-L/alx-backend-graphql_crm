@@ -58,3 +58,49 @@ def log_crm_heartbeat():
 # Allow standalone execution for quick test
 if __name__ == "__main__":
     log_crm_heartbeat()
+
+
+LOG_FILE_LOW_STOCK = "/tmp/low_stock_updates_log.txt"
+
+def update_low_stock():
+    """
+    Cron job to run a GraphQL mutation to restock low-stock products (stock < 10).
+    Logs updated products and messages to a log file.
+    """
+    now = datetime.datetime.now().strftime("%d/%m/%Y-%H:%M:%S")
+
+    transport = RequestsHTTPTransport(
+        url="http://localhost:8000/graphql",
+        verify=True,
+        retries=3,
+    )
+    client = Client(transport=transport, fetch_schema_from_transport=False)
+
+    mutation = gql("""
+    mutation {
+      updateLowStockProducts {
+        updatedProducts {
+          id
+          name
+          stock
+        }
+        message
+      }
+    }
+    """)
+
+    try:
+        response = client.execute(mutation)
+        updated_products = response['updateLowStockProducts']['updatedProducts']
+        message = response['updateLowStockProducts']['message']
+
+        log_lines = [f"{now} - {message}"]
+        for product in updated_products:
+            log_lines.append(f"Product: {product['name']}, Stock: {product['stock']}")
+
+        with open(LOG_FILE_LOW_STOCK, "a") as f:
+            f.write("\n".join(log_lines) + "\n")
+
+    except Exception as e:
+        with open(LOG_FILE_LOW_STOCK, "a") as f:
+            f.write(f"{now} - ERROR executing mutation: {e}\n")
