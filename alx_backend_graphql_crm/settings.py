@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+from celery.schedules import crontab
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -41,6 +42,7 @@ INSTALLED_APPS = [
     'graphene_django',
     'crm',
     'django_crontab',
+    'django_celery_beat',
 ]
 
 GRAPHENE = {
@@ -129,6 +131,17 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = 'static/'
+
+CELERY_BROKER_URL = "redis://localhost:6379/0"
+CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
+
+# Beat schedule
+CELERY_BEAT_SCHEDULE = {
+    "generate-crm-report": {
+        "task": "crm.tasks.generate_crm_report",
+        "schedule": crontab(day_of_week="mon", hour=6, minute=0),
+    },
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
