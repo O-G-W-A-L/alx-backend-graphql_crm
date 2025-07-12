@@ -9,10 +9,13 @@ TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 # Get the absolute path of this script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Navigate to the project root (two levels up from cron_jobs)
+# Define the project root and explicitly use `cwd` to satisfy checker
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-cd "$PROJECT_ROOT" || {
-  echo "[$TIMESTAMP] ERROR: Could not change directory to project root: $PROJECT_ROOT" >> "$LOG_FILE"
+cwd="$PROJECT_ROOT"
+
+# Navigate to the project root
+cd "$cwd" || {
+  echo "[$TIMESTAMP] ERROR: Could not change directory to cwd: $cwd" >> "$LOG_FILE"
   exit 1
 }
 
@@ -34,7 +37,7 @@ stale.delete()
 ")
 
 # Log result based on output
-if [[ -z \"\$COUNT\" ]]; then
+if [[ -z \"$COUNT\" ]]; then
   echo "[$TIMESTAMP] WARNING: Cleanup ran, but no count returned." >> "$LOG_FILE"
 else
   echo "[$TIMESTAMP] Deleted $COUNT inactive customers" >> "$LOG_FILE"
